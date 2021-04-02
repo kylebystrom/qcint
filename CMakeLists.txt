@@ -64,7 +64,7 @@ configure_file(
   "${PROJECT_BINARY_DIR}/include/cint.h")
 
 set(cintSrc 
-  src/breit.c src/c2f.c src/cart2sph.c src/cint1e.c src/cint2c2e.c
+  src/breit.c src/c2f.c src/cart2sph.c src/cart2sph_simd.c src/cint1e.c src/cint2c2e.c
   src/cint2e.c src/cint3c1e.c src/cint3c2e.c src/cint_bas.c src/fblas.c
   src/g1e.c src/g2e.c src/g2e_simd1.c src/g3c1e.c src/g3c2e.c
   src/gout2e.c src/misc.c src/optimizer.c src/rys_roots.c src/exp_simd.c
