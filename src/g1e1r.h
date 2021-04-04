@@ -99,7 +99,7 @@ void CINTinit_int1e1r_EnvVars(CINTEnvVarsR *envs, int *ng, int *shls,
 void CINTg2cr_index_xyz(int *idx, CINTEnvVarsR *envs);
 void CINTg1e1r_index_xyz(int *idx, CINTEnvVarsR *envs);
 
-void CINTg1e1r_rinv(double *g, CINTEnvVarsR *envs);
+void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs);
 
 void CINTrprim_to_ctr(__MD *gc, int nf, __MD *gp,
                      int inc, int nprim, int nctr, double *pcoeff);

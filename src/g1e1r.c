@@ -65,6 +65,10 @@ void CINTinit_int1e1r_EnvVars(CINTEnvVarsR *envs, int *ng, int *shls,
             envs->rk[i] = rk[0];
             envs->rk[i+SIMDD] = rk[1];
             envs->rk[i+2*SIMDD] = rk[2];
+        } for (; i < SIMDD; i++) {
+            envs->rk[i] = 0;
+            envs->rk[i+SIMDD] = 0;
+            envs->rk[i+2*SIMDD] = 0;
         }
 
         envs->common_factor = 1;
@@ -184,7 +188,7 @@ void CINTg1e1r_index_xyz(int *idx, CINTEnvVarsR *envs)
         CINTg2cr_index_xyz(idx, envs);
 }
 
-void CINTg1e1r_rinv(double *g, CINTEnvVarsR *envs)
+void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
 {
         int nmax = envs->li_ceil + envs->lj_ceil;
         int lj = envs->lj_ceil;
@@ -196,107 +200,101 @@ void CINTg1e1r_rinv(double *g, CINTEnvVarsR *envs)
         double *RESTRICT ri = envs->ri;
         double *RESTRICT rij = envs->rij;
         double *RESTRICT rirj = envs->rirj;
-        __MD tau;
-        ALIGNMM double x[SIMDD];
-        ALIGNMM double u[MXRYSROOTS*SIMDD];
-        ALIGNMM double w[MXRYSROOTS*SIMDD];
-        ALIGNMM double t2[MXRYSROOTS*SIMDD];
-        ALIGNMM double r0ix[MXRYSROOTS*SIMDD];
-        ALIGNMM double r0iy[MXRYSROOTS*SIMDD];
-        ALIGNMM double r0iz[MXRYSROOTS*SIMDD];
-        double *p0x, *p0y, *p0z, *p1x, *p1y, *p1z;
+        double tau;
+        __MD x;
+        __MD u[MXRYSROOTS];
+        __MD w[MXRYSROOTS];
+        __MD t2[MXRYSROOTS];
+        __MD r0ix[MXRYSROOTS];
+        __MD r0iy[MXRYSROOTS];
+        __MD r0iz[MXRYSROOTS];
+        __MD *p0x, *p0y, *p0z, *p1x, *p1y, *p1z;
         int i, j, k, n, ptr;
         __MD crij[3];
         __MD r0, r1, r2, rt2, fac1;
         double aij;
 
         aij = envs->ai + envs->aj;
-        tau = MM_SET1(1.0);
-        // TODO maybe can just set tau to some value?
+        tau = 1.0;
 
-        fac1 = 2*M_PI * envs->fac * tau / aij;
+        fac1 = MM_SET1(2*M_PI * envs->fac * tau / aij);
         crij[0] = MM_LOAD(envs->rk + 0*SIMDD) - MM_SET1(rij[0]);
         crij[1] = MM_LOAD(envs->rk + 1*SIMDD) - MM_SET1(rij[1]);
         crij[2] = MM_LOAD(envs->rk + 2*SIMDD) - MM_SET1(rij[2]);
-        MM_STORE(x, MM_SET1(aij) * tau * tau * SQUARE(crij));
-        for (i = 0; i < nrys_roots*SIMDD; i++) {
-                u[i] = 0;
-                w[i] = 0;
+        x = MM_SET1(aij * tau * tau) * SQUARE(crij);
+        for (i = 0; i < nrys_roots; i++) {
+                u[i] = MM_SET1(0.0);
+                w[i] = MM_SET1(0.0);
         }
-        CINTrys_roots(nrys_roots, x, u, w, SIMDD);
+        CINTrys_roots(nrys_roots, (double*) &x, (double*) u, (double*) w, SIMDD);
 
-        double *gx = g;
-        double *gy = g + envs->g_size     * SIMDD;
-        double *gz = g + envs->g_size * 2 * SIMDD;
+        __MD *gx = g;
+        __MD *gy = g + envs->g_size;
+        __MD *gz = g + envs->g_size * 2;
         r1 = MM_SET1(1.);
         for (i = 0; i < nrys_roots; i++) {
-                MM_STORE(gx+i*SIMDD, r1);
-                MM_STORE(gy+i*SIMDD, r1);
-                MM_STORE(gz+i*SIMDD, fac1 * MM_LOAD(w+i*SIMDD));
+                gx[i] = r1;
+                gy[i] = r1;
+                gz[i] = fac1 * w[i];
         }
         if (envs->g_size == 1) {
                 return;
         }
 
-        r2 = tau * tau;
+        r2 = MM_SET1(tau * tau);
         r1 = MM_SET1(1.);
         r0 = MM_SET1(0.5);
         for (i = 0; i < nrys_roots; i++) {
-                rt2 = MM_DIV(r2 * MM_LOAD(u+i*SIMDD), r1 + MM_LOAD(u+i*SIMDD));
-                MM_STORE(r0ix+i*SIMDD, MM_SET1(rij[0]) + rt2 * crij[0] - MM_SET1(ri[0]));
-                MM_STORE(r0iy+i*SIMDD, MM_SET1(rij[1]) + rt2 * crij[1] - MM_SET1(ri[1]));
-                MM_STORE(r0iz+i*SIMDD, MM_SET1(rij[2]) + rt2 * crij[2] - MM_SET1(ri[2]));
-                MM_STORE(t2+i*SIMDD, MM_DIV(r0 - r0 * rt2, MM_SET1(aij)));
+                rt2 = r2 * u[i] / (r1 + u[i]);
+                r0ix[i] = MM_SET1(rij[0]) + rt2 * crij[0] - MM_SET1(ri[0]);
+                r0iy[i] = MM_SET1(rij[1]) + rt2 * crij[1] - MM_SET1(ri[1]);
+                r0iz[i] = MM_SET1(rij[2]) + rt2 * crij[2] - MM_SET1(ri[2]);
+                t2[i] = (r0 - r0 * rt2) / MM_SET1(aij);
         }
 
         if (nmax > 0) {
-                p0x = gx + di * SIMDD;
-                p0y = gy + di * SIMDD;
-                p0z = gz + di * SIMDD;
+                p0x = gx + di;
+                p0y = gy + di;
+                p0z = gz + di;
                 for (n = 0; n < nrys_roots; n++) {
-//gx[1] = -rir0[0] * gx[0];
-//gy[1] = -rir0[1] * gy[0];
-//gz[1] = -rir0[2] * gz[0];
-MM_STORE(p0x+n*SIMDD, MM_LOAD(r0ix+n*SIMDD) * MM_LOAD(gx+n*SIMDD));
-MM_STORE(p0y+n*SIMDD, MM_LOAD(r0iy+n*SIMDD) * MM_LOAD(gy+n*SIMDD));
-MM_STORE(p0z+n*SIMDD, MM_LOAD(r0iz+n*SIMDD) * MM_LOAD(gz+n*SIMDD));
+                        p0x[n] = r0ix[n] * gx[n];
+                        p0y[n] = r0iy[n] * gy[n];
+                        p0z[n] = r0iz[n] * gz[n];
                 }
 
-                p0x = gx + di * SIMDD;
-                p0y = gy + di * SIMDD;
-                p0z = gz + di * SIMDD;
-                p1x = gx - di * SIMDD;
-                p1y = gy - di * SIMDD;
-                p1z = gz - di * SIMDD;
+                p0x = gx + di;
+                p0y = gy + di;
+                p0z = gz + di;
+                p1x = gx - di;
+                p1y = gy - di;
+                p1z = gz - di;
                 for (i = 1; i < nmax; i++) {
                         ptr = i * di;
                         for (n = 0; n < nrys_roots; n++) {
-                                r1 = MM_LOAD(t2+n*SIMDD) * MM_SET1(i);
-//gx[i+1] = 0.5 * (1 - t2) / aij * i * gx[i-1] - rir0[0] * gx[i];
-//gy[i+1] = 0.5 * (1 - t2) / aij * i * gy[i-1] - rir0[1] * gy[i];
-//gz[i+1] = 0.5 * (1 - t2) / aij * i * gz[i-1] - rir0[2] * gz[i];
-MM_STORE(p0x+(ptr+n)*SIMDD, r1 * MM_LOAD(p1x+(ptr+n)*SIMDD) + MM_LOAD(r0ix+n*SIMDD) * MM_LOAD(gx+(ptr+n)*SIMDD));
-MM_STORE(p0y+(ptr+n)*SIMDD, r1 * MM_LOAD(p1y+(ptr+n)*SIMDD) + MM_LOAD(r0iy+n*SIMDD) * MM_LOAD(gy+(ptr+n)*SIMDD));
-MM_STORE(p0z+(ptr+n)*SIMDD, r1 * MM_LOAD(p1z+(ptr+n)*SIMDD) + MM_LOAD(r0iz+n*SIMDD) * MM_LOAD(gz+(ptr+n)*SIMDD));
+                                r1 = t2[n] * MM_SET1(i);
+                                k = ptr + n;
+                                p0x[k] = r1 * p1x[k] + r0ix[n] * gx[k];
+                                p0y[k] = r1 * p1y[k] + r0iy[n] * gy[k];
+                                p0z[k] = r1 * p1z[k] + r0iz[n] * gz[k];
                         }
                 }
 
-                p0x = gx  - dj * SIMDD;
-                p0y = gy  - dj * SIMDD;
-                p0z = gz  - dj * SIMDD;
-                p1x = p0x + di * SIMDD;
-                p1y = p0y + di * SIMDD;
-                p1z = p0z + di * SIMDD;
+                p0x = gx  - dj;
+                p0y = gy  - dj;
+                p0z = gz  - dj;
+                p1x = p0x + di;
+                p1y = p0y + di;
+                p1z = p0z + di;
                 for (j = 1; j <= lj; j++) {
                         for (i = 0; i <= nmax - j; i++) {
                                 ptr = dj * j + i * di;
                                 for (n = ptr; n < ptr+nrys_roots; n++) {
-//gx[i] = gx[i+1-dj] + rirj[0] * gx[i-dj];
-//gy[i] = gy[i+1-dj] + rirj[1] * gy[i-dj];
-//gz[i] = gz[i+1-dj] + rirj[2] * gz[i-dj];
-MM_STORE(gx+n*SIMDD, MM_LOAD(p1x+n*SIMDD) + MM_SET1(rirj[0]) * MM_LOAD(p0x+n*SIMDD));
-MM_STORE(gy+n*SIMDD, MM_LOAD(p1y+n*SIMDD) + MM_SET1(rirj[1]) * MM_LOAD(p0y+n*SIMDD));
-MM_STORE(gz+n*SIMDD, MM_LOAD(p1z+n*SIMDD) + MM_SET1(rirj[2]) * MM_LOAD(p0z+n*SIMDD));
+                                        gx[n] = MM_FMA(MM_SET1(rirj[0]), p0x[n], p1x[n]);
+                                        gy[n] = MM_FMA(MM_SET1(rirj[1]), p0y[n], p1y[n]);
+                                        gz[n] = MM_FMA(MM_SET1(rirj[2]), p0z[n], p1z[n]);
+                                        //gx[n] = p1x[n] + MM_SET1(rirj[0]) * p0x[n];
+                                        //gy[n] = p1y[n] + MM_SET1(rirj[1]) * p0y[n];
+                                        //gz[n] = p1z[n] + MM_SET1(rirj[2]) * p0z[n];
                                 }
                         }
                 }

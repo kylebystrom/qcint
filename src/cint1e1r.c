@@ -143,6 +143,9 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
         MALLOC_INSTACK(g, envs->g_size * 3 * ((1<<envs->gbits)+1)); // +1 as buffer
         MALLOC_INSTACK(gout, nf * n_comp);
         MALLOC_INSTACK(gctri, nf * i_ctr * n_comp);
+        CINTdset0(envs->g_size * 3 * ((1<<envs->gbits)+1) * SIMDD, (double *) g);
+        CINTdset0(nf * n_comp * SIMDD, (double *) gout);
+        CINTdset0(nf * i_ctr * n_comp * SIMDD, (double *) gctri);
         double expcutoff = envs->expcutoff;
 
         CINTg1e1r_index_xyz(idx, envs);
@@ -231,6 +234,7 @@ int CINT1e1r_drv(__MD *out, int *dims, CINTEnvVarsR *envs, CINTOpt *opt,
         }
         __MD *gctr;
         MALLOC_INSTACK(gctr, nc*n_comp);
+        CINTdset0(nc*n_comp*SIMDD, (double *) gctr);
 
         int n, has_value;
         if (opt != NULL) {
@@ -279,7 +283,7 @@ void CINTgout1e1r_rinv(__MD *gout, __MD *g, int *idx, CINTEnvVarsR *envs)
         __MD *gx, *gy, *gz;
         __MD r0;
         __MD zero = MM_SET1(0.0);
-        for (n = 0; n < nf*SIMDD; n++) {
+        for (n = 0; n < nf; n++) {
                 gtmp[n] = zero;
         }
         CINTg1e1r_rinv(g, envs);
@@ -303,7 +307,7 @@ int int1e1r_rinv_sph(double *out, int *dims, int *shls, int *atm, int natm,
         CINTEnvVarsR envs;
         CINTinit_int1e1r_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
         envs.f_gout = &CINTgout1e1r_rinv;
-        return CINT1e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e_simd);
+        return CINT1e1r_drv((__MD*)out, dims, &envs, opt, cache, &c2s_sph_1e_simd);
 }
 void int1e1r_rinv_optimizer(CINTOpt **opt, int *atm, int natm,
                          int *bas, int nbas, double *env)
@@ -318,10 +322,19 @@ int int1e1r_rinv_cart(double *out, int *dims, int *shls, int *atm, int natm,
         CINTEnvVarsR envs;
         CINTinit_int1e1r_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
         envs.f_gout = &CINTgout1e1r_rinv;
-        return CINT1e_drv(out, dims, &envs, opt, cache, &c2s_cart_1e_simd);
+        return CINT1e1r_drv((__MD*)out, dims, &envs, opt, cache, &c2s_cart_1e_simd);
 }
 
 
-ALL_CINT1E(int1e1r_rinv)
-ALL_CINT1E_FORTRAN_(int1e1r_rinv)
+#define SOME_CINT1E(NAME) \
+int c##NAME##_cart(double *out, int *shls, int *atm, int natm, \
+            int *bas, int nbas, double *env) { \
+        return NAME##_cart(out, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL); \
+} \
+int c##NAME##_sph(double *out, int *shls, int *atm, int natm, \
+            int *bas, int nbas, double *env) { \
+        return NAME##_sph(out, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL); \
+} \
+
+SOME_CINT1E(int1e1r_rinv)
 

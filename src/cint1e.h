@@ -19,6 +19,7 @@
  */
 
 #include <complex.h>
+#include "simd.h"
 
 int CINT1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
                double *cache, void (*f_c2s)());
