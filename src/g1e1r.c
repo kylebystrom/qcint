@@ -27,6 +27,8 @@
 #include "g1e1r.h"
 #include "rys_roots.h"
 
+#include <stdio.h>
+
 #define DEF_GXYZ(type, G, GX, GY, GZ) \
         type *GX = G; \
         type *GY = G + envs->g_size     * SIMDD; \
@@ -60,7 +62,7 @@ void CINTinit_int1e1r_EnvVars(CINTEnvVarsR *envs, int *ng, int *shls,
         envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
         rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
-        for (i = 0; (i < SIMDD) && (k_sh+i < nbas); i++) {
+        for (i = 0; (i < SIMDD) && (k_sh+i < shls[3]); i++) {
             rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh+i));
             envs->rk[i] = rk[0];
             envs->rk[i+SIMDD] = rk[1];
@@ -107,6 +109,7 @@ void CINTinit_int1e1r_EnvVars(CINTEnvVarsR *envs, int *ng, int *shls,
         envs->g_stride_l = 0;
 }
 
+/*
 void CINTg2cr_index_xyz(int *idx, CINTEnvVarsR *envs)
 {
         int i_l = envs->i_l;
@@ -187,6 +190,42 @@ void CINTg1e1r_index_xyz(int *idx, CINTEnvVarsR *envs)
 {
         CINTg2cr_index_xyz(idx, envs);
 }
+*/
+
+void CINTg1e1r_index_xyz(int *idx, CINTEnvVarsR *envs)
+{
+        const int i_l = envs->i_l;
+        const int j_l = envs->j_l;
+        const int nfi = envs->nfi;
+        const int nfj = envs->nfj;
+        const int di = envs->g_stride_i;
+        const int dj = envs->g_stride_j;
+        int i, j, n;
+        int ofx, ofjx;
+        int ofy, ofjy;
+        int ofz, ofjz;
+        int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
+        int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
+
+        CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+        CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+
+        ofx = 0;
+        ofy = envs->g_size;
+        ofz = envs->g_size * 2;
+        n = 0;
+        for (j = 0; j < nfj; j++) {
+                ofjx = ofx + dj * j_nx[j];
+                ofjy = ofy + dj * j_ny[j];
+                ofjz = ofz + dj * j_nz[j];
+                for (i = 0; i < nfi; i++) {
+                        idx[n+0] = ofjx + di * i_nx[i];
+                        idx[n+1] = ofjy + di * i_ny[i];
+                        idx[n+2] = ofjz + di * i_nz[i];
+                        n += 3;
+                }
+        }
+}
 
 void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
 {
@@ -245,7 +284,7 @@ void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
         r1 = MM_SET1(1.);
         r0 = MM_SET1(0.5);
         for (i = 0; i < nrys_roots; i++) {
-                rt2 = r2 * u[i] / (r1 + u[i]);
+                rt2 = MM_DIV(r2 * u[i], (r1 + u[i]));
                 r0ix[i] = MM_SET1(rij[0]) + rt2 * crij[0] - MM_SET1(ri[0]);
                 r0iy[i] = MM_SET1(rij[1]) + rt2 * crij[1] - MM_SET1(ri[1]);
                 r0iz[i] = MM_SET1(rij[2]) + rt2 * crij[2] - MM_SET1(ri[2]);

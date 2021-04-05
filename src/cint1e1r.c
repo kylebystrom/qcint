@@ -143,9 +143,6 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
         MALLOC_INSTACK(g, envs->g_size * 3 * ((1<<envs->gbits)+1)); // +1 as buffer
         MALLOC_INSTACK(gout, nf * n_comp);
         MALLOC_INSTACK(gctri, nf * i_ctr * n_comp);
-        CINTdset0(envs->g_size * 3 * ((1<<envs->gbits)+1) * SIMDD, (double *) g);
-        CINTdset0(nf * n_comp * SIMDD, (double *) gout);
-        CINTdset0(nf * i_ctr * n_comp * SIMDD, (double *) gctri);
         double expcutoff = envs->expcutoff;
 
         CINTg1e1r_index_xyz(idx, envs);
@@ -157,10 +154,11 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
         for (jp = 0; jp < j_prim; jp++) {
                 envs->aj = aj[jp];
                 if (j_ctr == 1) {
-                        fac1j = common_factor * cj[jp];
+                        fac1j = common_factor;// * cj[jp];
                 } else {
                         fac1j = common_factor;
                 }
+                CINTdset0(nf * i_ctr * n_comp * SIMDD, (double *) gctri);
                 for (ip = 0; ip < i_prim; ip++) {
                         envs->ai = ai[ip];
                         aij = 1 / (ai[ip] + aj[jp]);
@@ -175,6 +173,7 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
                         fac1i = fac1j * exp(-eij);
                         envs->fac = fac1i;
 
+                        CINTdset0(nf * n_comp * SIMDD, (double *) gout);
                         (*envs->f_gout)(gout, g, idx, envs);
 
                         n = nf * n_comp;
@@ -277,7 +276,7 @@ void CINTgout1e1r_rinv(__MD *gout, __MD *g, int *idx, CINTEnvVarsR *envs)
 {
         int nf = envs->nf;
         int nfc = nf;
-        __MD *gtmp = gout + nf;
+        __MD *gtmp = gout;// + nf;
         int nrys_roots = envs->nrys_roots;
         int n, i;
         __MD *gx, *gy, *gz;
@@ -291,7 +290,7 @@ void CINTgout1e1r_rinv(__MD *gout, __MD *g, int *idx, CINTEnvVarsR *envs)
                 gx = g + idx[n*3+0];
                 gy = g + idx[n*3+1];
                 gz = g + idx[n*3+2];
-                r0 = gtmp[n];
+                r0 = zero;//gtmp[n];
                 for (i = 0; i < nrys_roots; i++) {
                         r0 += gx[i] * gy[i] * gz[i];
                 }
