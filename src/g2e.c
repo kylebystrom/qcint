@@ -1989,11 +1989,13 @@ int CINTg0_2e(double *g, Rys2eT *bc, CINTEnvVars *envs, int count)
                 }
         } else {
                 for (i = 0; i < count; i++) {
-                        CINTrys_roots(envs->nrys_roots, x[i], u+i, w+i);
+                        CINTrys_roots(nroots, x[i], u+i, w+i);
                 }
         }
 #else
-        CINTrys_roots(nroots, x, u, w, count);
+        for (i = 0; i < count; i++) {
+                CINTrys_roots(nroots, x[i], u+i, w+i);
+        }
 #endif
 
         double *gx = g;
