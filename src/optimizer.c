@@ -199,6 +199,17 @@ void CINTall_1e_optimizer(CINTOpt **opt, int *ng,
                 2, 0, ng, atm, natm, bas, nbas, env);
 }
 
+void CINTall_1e1r_optimizer(CINTOpt **opt, int *ng,
+                            int *atm, int natm, int *bas, int nbas, double *env)
+{
+        CINTinit_2e_optimizer(opt, atm, natm, bas, nbas, env);
+        CINTOpt_setij(*opt, ng, atm, natm, bas, nbas, env);
+        CINTOpt_set_log_maxc(*opt, atm, natm, bas, nbas, env);
+        CINTOpt_set_non0coeff(*opt, atm, natm, bas, nbas, env);
+        gen_idx(*opt, &CINTinit_int1e_EnvVars, &CINTg2c_index_xyz,
+                2, 0, ng, atm, natm, bas, nbas, env);
+}
+
 void CINTall_2e_optimizer(CINTOpt **opt, int *ng,
                           int *atm, int natm, int *bas, int nbas, double *env)
 {

@@ -108,6 +108,18 @@
         } \
         POP_PRIM2CTR
 
+#define SET_RIJ    \
+        if (pdata_ij->cceij > expcutoff) { \
+                continue; \
+        } \
+        envs->ai  = ai[ip]; \
+        envs->aij = ai[ip] + aj[jp]; \
+        expij = pdata_ij->eij; \
+        rij = pdata_ij->rij; \
+        envs->rij[0] = rij[0]; \
+        envs->rij[1] = rij[1]; \
+        envs->rij[2] = rij[2];
+
 
 int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
 {
@@ -134,8 +146,6 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
         int ip, jp, i, n;
         int has_value = 0;
         double tau;
-        __MD *cr;
-        double x, u[MXRYSROOTS], w[MXRYSROOTS];
         int *idx = malloc(sizeof(int) * nf * 3);
         double rij[3], aij, dij, eij, rrij, t2;
         double fac1j, fac1i;
@@ -186,8 +196,106 @@ int CINT1e1r_loop_nopt(__MD *gctr, CINTEnvVarsR *envs, double *cache)
         return has_value;
 }
 
+/*
 int CINT1e1r_loop(__MD *out, CINTEnvVarsR *envs, CINTOpt *opt, double *cache) {
     return CINT1e1r_loop_nopt(out, envs, cache);
+}
+*/
+
+int CINT1e1r_loop(__MD *gctr, CINTEnvVarsR *envs, CINTOpt *opt, double *cache)
+{
+        int *shls  = envs->shls;
+        int *atm = envs->atm;
+        int *bas = envs->bas;
+        double *env = envs->env;
+        int i_sh = shls[0];
+        int j_sh = shls[1];
+        int i_l = envs->i_l;
+        int j_l = envs->j_l;
+        int i_ctr = envs->x_ctr[0];
+        int j_ctr = envs->x_ctr[1];
+        int i_prim = bas(NPRIM_OF, i_sh);
+        int j_prim = bas(NPRIM_OF, j_sh);
+        int nf = envs->nf;
+        int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+        double *ri = envs->ri;
+        double *rj = envs->rj;
+        double *ai = env + bas(PTR_EXP, i_sh);
+        double *aj = env + bas(PTR_EXP, j_sh);
+        double *ci = env + bas(PTR_COEFF, i_sh);
+        double *cj = env + bas(PTR_COEFF, j_sh);
+        int ip, jp, i, n;
+        int has_value = 0;
+        double tau;
+        double aij, dij, eij, rrij, t2;
+        double fac1j, fac1i;
+        __MD *g, *gout, *gctri;
+        MALLOC_INSTACK(g, envs->g_size * 3 * ((1<<envs->gbits)+1)); // +1 as buffer
+        MALLOC_INSTACK(gout, nf * n_comp);
+        MALLOC_INSTACK(gctri, nf * i_ctr * n_comp);
+        double expcutoff = envs->expcutoff;
+
+        PairData *pdata_base, *pdata_ij;
+        if (opt->pairdata != NULL) {
+                pdata_base = opt->pairdata[i_sh*opt->nbas+j_sh];
+        } else {
+                double *log_maxci = opt->log_max_coeff[i_sh];
+                double *log_maxcj = opt->log_max_coeff[j_sh];
+                MALLOC_INSTACK(pdata_base, i_prim*j_prim);
+                if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+                                     log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+                                     i_prim, j_prim, SQUARE(envs->rirj), expcutoff)) {
+                        return 0;
+                }
+        }
+        double expij;
+        double *rij;
+
+        rrij = SQUARE(envs->rirj);
+        double common_factor = envs->common_factor
+                * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l);
+        int *idx = opt->index_xyz_array[envs->i_l*LMAX1+envs->j_l];
+        int *non0ctr[2] = {opt->non0ctr[i_sh], opt->non0ctr[j_sh]};
+        int *non0idx[2] = {opt->sortedidx[i_sh], opt->sortedidx[j_sh]};
+
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+                envs->aj = aj[jp];
+                if (j_ctr == 1) {
+                        fac1j = common_factor;// * cj[jp];
+                } else {
+                        fac1j = common_factor;
+                }
+                CINTdset0(nf * i_ctr * n_comp * SIMDD, (double *) gctri);
+                for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                        //SET_RIJ
+                        if (pdata_ij->cceij > expcutoff) {
+                                goto i_contracted;
+                        }
+                        envs->ai  = ai[ip];
+                        envs->aij = ai[ip] + aj[jp];
+                        expij = pdata_ij->eij;
+                        rij = pdata_ij->rij;
+                        envs->rij[0] = rij[0];
+                        envs->rij[1] = rij[1];
+                        envs->rij[2] = rij[2];
+                        has_value = 1;
+
+                        fac1i = fac1j * expij;
+                        envs->fac = fac1i;
+
+                        CINTdset0(nf * n_comp * SIMDD, (double *) gout);
+                        (*envs->f_gout)(gout, g, idx, envs);
+
+                        n = nf * n_comp;
+                        CINTrprim_to_ctr(gctri, n, gout, 1, i_prim, i_ctr, ci+ip);
+
+i_contracted: ;
+                }
+                n = nf * i_ctr;
+                CINTrprim_to_ctr(gctr, n, gctri, n_comp, j_prim, j_ctr, cj+jp);
+        }
+        return has_value;
 }
 
 // little endian on x86
@@ -217,7 +325,7 @@ int int1e1r_cache_size(CINTEnvVarsR *envs)
 }
 
 int CINT1e1r_drv(__MD *out, int *dims, CINTEnvVarsR *envs, CINTOpt *opt,
-               double *cache, void (*f_c2s)())
+                 double *cache, void (*f_c2s)())
 {
         if (out == NULL) {
                 return int1e1r_cache_size(envs);
