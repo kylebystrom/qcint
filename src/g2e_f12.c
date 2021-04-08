@@ -260,7 +260,9 @@ int CINTg0_2e_yp(double *g, Rys2eT *bc, CINTEnvVars *envs, int count)
                         MM_STORE(u+i*SIMDD, MM_DIV(r0, r1 - r0));
                 }
         } else {
-                CINTrys_roots(nroots, x, u, w, count);
+                for (i = 0; i < count; i++) {
+                        CINTrys_roots(nroots, x[i], u+i, w+i);
+                }
         }
 
         r0 = MM_LOAD(fac1);
@@ -378,7 +380,7 @@ int CINTg0_2e_yp_simd1(double *g, Rys2eT *bc, CINTEnvVars *envs, int idsimd)
                         u[i*SIMDD] = u[i*SIMDD] / (1 - u[i*SIMDD]);
                 }
         } else {
-                CINTrys_roots(nroots, x, u, w, 1);
+                CINTrys_roots(nroots, x[0], u, w);
         }
 
         double *gx = g;
@@ -512,7 +514,9 @@ int CINTg0_2e_stg(double *g, Rys2eT *bc, CINTEnvVars *envs, int count)
                         MM_STORE(u+i*SIMDD, MM_DIV(r0, r3));
                 }
         } else {
-                CINTrys_roots(nroots, x, u, w, count);
+                for (i = 0; i < count; i++) {
+                        CINTrys_roots(nroots, x[i], u+i, w+i);
+                }
         }
 
         double *gx = g;
@@ -634,7 +638,7 @@ int CINTg0_2e_stg_simd1(double *g, Rys2eT *bc, CINTEnvVars *envs, int idsimd)
                         u[i*SIMDD] = u[i*SIMDD] / (1 - u[i*SIMDD]);
                 }
         } else {
-                CINTrys_roots(nroots, x, u, w, 1);
+                CINTrys_roots(nroots, x[0], u, w);
         }
 
         double *gx = g;
