@@ -62,15 +62,17 @@ void CINTinit_int1e1r_EnvVars(CINTEnvVarsR *envs, int *ng, int *shls,
         envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
         rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
+        double *rkp = (double *) &(envs->rk[0]);
+
         for (i = 0; (i < SIMDD) && (k_sh+i < shls[3]); i++) {
             rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh+i));
-            envs->rk[i] = rk[0];
-            envs->rk[i+SIMDD] = rk[1];
-            envs->rk[i+2*SIMDD] = rk[2];
+            rkp[i] = rk[0];
+            rkp[i+SIMDD] = rk[1];
+            rkp[i+2*SIMDD] = rk[2];
         } for (; i < SIMDD; i++) {
-            envs->rk[i] = 0;
-            envs->rk[i+SIMDD] = 0;
-            envs->rk[i+2*SIMDD] = 0;
+            rkp[i] = 0;
+            rkp[i+SIMDD] = 0;
+            rkp[i+2*SIMDD] = 0;
         }
 
         envs->common_factor = 1;
@@ -243,6 +245,9 @@ void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
         __MD x;
         __MD u[MXRYSROOTS];
         __MD w[MXRYSROOTS];
+        double *xp = (double*) &x;
+        double *up = (double*) &u[0];
+        double *wp = (double*) &w[0];
         __MD t2[MXRYSROOTS];
         __MD r0ix[MXRYSROOTS];
         __MD r0iy[MXRYSROOTS];
@@ -257,15 +262,17 @@ void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
         tau = 1.0;
 
         fac1 = MM_SET1(2*M_PI * envs->fac * tau / aij);
-        crij[0] = MM_LOAD(envs->rk + 0*SIMDD) - MM_SET1(rij[0]);
-        crij[1] = MM_LOAD(envs->rk + 1*SIMDD) - MM_SET1(rij[1]);
-        crij[2] = MM_LOAD(envs->rk + 2*SIMDD) - MM_SET1(rij[2]);
+        crij[0] = envs->rk[0] - MM_SET1(rij[0]);
+        crij[1] = envs->rk[1] - MM_SET1(rij[1]);
+        crij[2] = envs->rk[2] - MM_SET1(rij[2]);
         x = MM_SET1(aij * tau * tau) * SQUARE(crij);
         for (i = 0; i < nrys_roots; i++) {
                 u[i] = MM_SET1(0.0);
                 w[i] = MM_SET1(0.0);
         }
-        CINTrys_roots(nrys_roots, (double*) &x, (double*) u, (double*) w, SIMDD);
+        for (i=0; i<SIMDD; i++) {
+                CINTrys_roots(nrys_roots, xp[i], up+i, wp+i);
+        }
 
         __MD *gx = g;
         __MD *gy = g + envs->g_size;

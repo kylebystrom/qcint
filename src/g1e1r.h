@@ -71,7 +71,7 @@ typedef struct {
 
         double *ri;
         double *rj;
-        ALIGNMM double rk[12];
+        __MD rk[3];
 
         int (*f_g0_2e)();
         void (*f_g0_2d4d)();

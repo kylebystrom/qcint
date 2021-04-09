@@ -84,7 +84,7 @@ if(WITH_RANGE_COULOMB)
 endif(WITH_RANGE_COULOMB)
 
 if(WITH_COULOMB_ERF)
-  set(cintSrc ${cintSrc} src/g2e_coulerf.c src/cint2e_coulerf.c)
+  set(cintSrc ${cintSrc} src/erfc_roots.c src/g2e_coulerf.c src/cint2e_coulerf.c)
   add_definitions(-DWITH_COULOMB_ERF)
   message("Enabled WITH_COULOMB_ERF")
 endif(WITH_COULOMB_ERF)
