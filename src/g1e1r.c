@@ -322,6 +322,9 @@ void CINTg1e1r_rinv(__MD *g, CINTEnvVarsR *envs)
                                 p0x[k] = r1 * p1x[k] + r0ix[n] * gx[k];
                                 p0y[k] = r1 * p1y[k] + r0iy[n] * gy[k];
                                 p0z[k] = r1 * p1z[k] + r0iz[n] * gz[k];
+                                //p0x[k] = MM_FMA(r1, p1x[k], r0ix[n] * gx[k]);
+                                //p0y[k] = MM_FMA(r1, p1y[k], r0iy[n] * gy[k]);
+                                //p0z[k] = MM_FMA(r1, p1z[k], r0iz[n] * gz[k]);
                         }
                 }
 
