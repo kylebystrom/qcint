@@ -527,7 +527,7 @@ void int1e1r_rinv_optimizer(CINTOpt **opt, int *atm, int natm,
                          int *bas, int nbas, double *env)
 {
         int ng[] = {0, 0, 0, 0, 0, 1, 0, 1};
-        CINTall_1e_optimizer(opt, ng, atm, natm, bas, nbas, env);
+        CINTall_1e1r_optimizer(opt, ng, atm, natm, bas, nbas, env);
 }
 int int1e1r_rinv_cart(double *out, int *dims, int *shls, int *atm, int natm,
                    int *bas, int nbas, double *env, CINTOpt *opt, double *cache)
